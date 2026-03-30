@@ -2,14 +2,25 @@ import * as THREE from 'three';
 
 export function createPointCloud(positions, colors) {
       const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-      geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+      const posAttr = new THREE.BufferAttribute(positions, 3);
+      const colAttr = new THREE.BufferAttribute(colors, 3);
+
+      geometry.setAttribute('position', posAttr);
+      geometry.setAttribute('color', colAttr);
+      geometry.computeBoundingSphere();
+
+      const count = positions.length / 3;
+      const pointSize = count > 200_000 ? 1.5 : count > 50_000 ? 2 : 3;
 
       const material = new THREE.PointsMaterial({
-            size: 2,
+            size: pointSize,
             vertexColors: true,
             sizeAttenuation: false,
-            depthWrite: true,
+            depthWrite: false,
+            depthTest: true,
+            transparent: true,
+            opacity: 0.85,
       });
 
       return new THREE.Points(geometry, material);

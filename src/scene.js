@@ -13,7 +13,7 @@ export function createScene(container) {
       );
       camera.position.set(400, 350, 400);
 
-      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.setSize(container.clientWidth, container.clientHeight);
       container.appendChild(renderer.domElement);
@@ -28,20 +28,29 @@ export function createScene(container) {
       controls.maxDistance = 900;
       controls.update();
 
-      const onResize = () => {
+      let needsRender = true;
+
+      function requestRender() {
+            needsRender = true;
+      }
+
+      controls.addEventListener('change', requestRender);
+      window.addEventListener('resize', () => {
             camera.aspect = container.clientWidth / container.clientHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(container.clientWidth, container.clientHeight);
-      };
-      window.addEventListener('resize', onResize);
+            requestRender();
+      });
 
-      let animationId;
       const animate = () => {
-            animationId = requestAnimationFrame(animate);
+            requestAnimationFrame(animate);
             controls.update();
-            renderer.render(scene, camera);
+            if (needsRender) {
+                  renderer.render(scene, camera);
+                  needsRender = false;
+            }
       };
       animate();
 
-      return { scene, camera, renderer, controls };
+      return { scene, camera, renderer, controls, requestRender };
 }

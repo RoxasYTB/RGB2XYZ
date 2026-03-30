@@ -88,6 +88,31 @@
                   display: block;
             }
 
+            #density-wrapper {
+                  display: none;
+                  padding: 10px 16px;
+                  background: rgba(0, 0, 0, 0.6);
+                  border: 1px solid rgba(255, 255, 255, 0.08);
+                  border-radius: 8px;
+                  font-size: 13px;
+                  backdrop-filter: blur(12px);
+            }
+
+            #density-wrapper.visible {
+                  display: block;
+            }
+
+            #density-wrapper label {
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+            }
+
+            #density-slider {
+                  flex: 1;
+                  accent-color: #8cb4ff;
+            }
+
             #canvas-container {
                   width: 100vw;
                   height: 100vh;
@@ -106,9 +131,17 @@
                   <input type="file" id="file-input" accept="image/*">
             </label>
             <div id="progress">Traitement en cours…</div>
+            <div id="density-wrapper">
+                  <label>
+                        Densité
+                        <input type="range" id="density-slider" min="10000" max="1000000" step="10000" value="500000">
+                        <span id="density-value">500k</span>
+                  </label>
+            </div>
             <div id="stats">
                   Pixels : <span id="stat-pixels">—</span><br>
                   Couleurs uniques : <span id="stat-colors">—</span><br>
+                  Affichés : <span id="stat-displayed">—</span><br>
                   Compression : <span id="stat-compression">—</span><br>
                   Temps : <span id="stat-time">—</span>
             </div>
