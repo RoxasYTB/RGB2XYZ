@@ -1,26 +1,40 @@
 const MAX_POINTS = 500_000;
 
-function sampleColors(colorMap, maxPoints) {
+function sampleColors(colorMap, maxPoints, darkestKey) {
       if (colorMap.size <= maxPoints) return colorMap;
       const keys = Array.from(colorMap.keys());
       const step = keys.length / maxPoints;
       const sampled = new Map();
-      for (let i = 0; i < maxPoints; i++) {
+      sampled.set(darkestKey, 1);
+      let taken = 1;
+      for (let i = 0; i < maxPoints && taken < maxPoints; i++) {
             const key = keys[Math.floor(i * step)];
-            sampled.set(key, 1);
+            if (!sampled.has(key)) {
+                  sampled.set(key, 1);
+                  taken++;
+            }
       }
       return sampled;
 }
 
 function extractColors(pixels) {
       const colorMap = new Map();
+      let darkestKey = -1;
+      let darkestLuma = Infinity;
       for (let i = 0; i < pixels.length; i += 4) {
             const key = (pixels[i] << 16) | (pixels[i + 1] << 8) | pixels[i + 2];
+            if (pixels[i] !== 0 && pixels[i + 1] !== 0 && pixels[i + 2] !== 0) {
+                  const luma = 0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2];
+                  if (luma < darkestLuma) {
+                        darkestLuma = luma;
+                        darkestKey = key;
+                  }
+            }
             if (!colorMap.has(key)) {
                   colorMap.set(key, 1);
             }
       }
-      return colorMap;
+      return { colorMap, darkestKey };
 }
 
 function buildBuffers(colorMap) {
@@ -50,13 +64,13 @@ self.onmessage = function (e) {
       const totalPixels = width * height;
       const limit = maxPoints || MAX_POINTS;
 
-      const fullMap = extractColors(pixels);
-      const uniqueCount = fullMap.size;
-      const sampled = sampleColors(fullMap, limit);
+      const { colorMap, darkestKey } = extractColors(pixels);
+      const uniqueCount = colorMap.size;
+      const sampled = sampleColors(colorMap, limit, darkestKey);
       const { positions, colors } = buildBuffers(sampled);
 
       self.postMessage(
-            { positions, colors, uniqueCount, displayedCount: sampled.size, totalPixels },
+            { positions, colors, uniqueCount, displayedCount: sampled.size, totalPixels, darkestKey },
             [positions.buffer, colors.buffer]
       );
 };

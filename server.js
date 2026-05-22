@@ -20,27 +20,25 @@ const MIME = {
       ".woff2": "font/woff2",
 };
 
-http
-      .createServer((req, res) => {
-            const urlPath = decodeURIComponent(req.url.split("?")[0]);
-            const safePath = path.normalize(urlPath).replace(/^(\.\.[/\\])+/, "");
-            const isRoot = safePath === "/" || safePath === "\\";
-            let filePath = path.join(ROOT, isRoot ? "index.html" : safePath);
+http.createServer((req, res) => {
+      const urlPath = decodeURIComponent(req.url.split("?")[0]);
+      const safePath = path.normalize(urlPath).replace(/^(\.\.[/\\])+/, "");
+      const isRoot = safePath === "/" || safePath === "\\";
+      let filePath = path.join(ROOT, isRoot ? "index.html" : safePath);
 
-            fs.stat(filePath, (err, stats) => {
-                  if (err || !stats.isFile()) {
-                        res.writeHead(404);
-                        res.end("Not found");
-                        return;
-                  }
+      fs.stat(filePath, (err, stats) => {
+            if (err || !stats.isFile()) {
+                  res.writeHead(404);
+                  res.end("Not found");
+                  return;
+            }
 
-                  const ext = path.extname(filePath).toLowerCase();
-                  res.writeHead(200, {
-                        "Content-Type": MIME[ext] || "application/octet-stream",
-                  });
-                  fs.createReadStream(filePath).pipe(res);
+            const ext = path.extname(filePath).toLowerCase();
+            res.writeHead(200, {
+                  "Content-Type": MIME[ext] || "application/octet-stream",
             });
-      })
-      .listen(PORT, () => {
-            console.log(`http://localhost:${PORT}`);
+            fs.createReadStream(filePath).pipe(res);
       });
+}).listen(PORT, () => {
+      console.log(`http://localhost:${PORT}`);
+});

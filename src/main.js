@@ -12,6 +12,7 @@ const statColors = document.getElementById('stat-colors');
 const statDisplayed = document.getElementById('stat-displayed');
 const statCompression = document.getElementById('stat-compression');
 const statTime = document.getElementById('stat-time');
+const statDarkest = document.getElementById('stat-darkest');
 const densityWrapper = document.getElementById('density-wrapper');
 const densitySlider = document.getElementById('density-slider');
 const densityValue = document.getElementById('density-value');
@@ -38,11 +39,14 @@ function showProgress(visible) {
       progressEl.classList.toggle('visible', visible);
 }
 
-function showStats(totalPixels, uniqueCount, displayedCount, timeMs) {
+function showStats(totalPixels, uniqueCount, displayedCount, timeMs, darkestKey) {
       statPixels.textContent = formatNumber(totalPixels);
       statColors.textContent = formatNumber(uniqueCount);
       statDisplayed.textContent = formatNumber(displayedCount);
       statCompression.textContent = ((1 - uniqueCount / totalPixels) * 100).toFixed(2) + ' %';
+      statDarkest.textContent = darkestKey !== -1
+            ? `rgb(${(darkestKey >> 16) & 0xff}, ${(darkestKey >> 8) & 0xff}, ${darkestKey & 0xff})`
+            : '—';
       statTime.textContent = timeMs + ' ms';
       statsEl.classList.add('visible');
 }
@@ -53,8 +57,15 @@ function processWithWorker(buffer, width, height, maxPoints) {
 }
 
 worker.onmessage = (e) => {
-      const { positions, colors, uniqueCount, displayedCount, totalPixels } = e.data;
+      const { positions, colors, uniqueCount, displayedCount, totalPixels, darkestKey } = e.data;
       const elapsed = Math.round(performance.now() - worker._t0);
+
+      if (darkestKey !== -1) {
+            const dr = (darkestKey >> 16) & 0xff;
+            const dg = (darkestKey >> 8) & 0xff;
+            const db = darkestKey & 0xff;
+            console.log(`Pixel le plus sombre (hors noir) : [${dr}, ${dg}, ${db}] — position RGB (${dr}, ${dg}, ${db})`);
+      }
 
       disposePointCloud(scene, currentCloud);
       currentCloud = createPointCloud(positions, colors);
@@ -62,7 +73,7 @@ worker.onmessage = (e) => {
       requestRender();
 
       showProgress(false);
-      showStats(totalPixels, uniqueCount, displayedCount, elapsed);
+      showStats(totalPixels, uniqueCount, displayedCount, elapsed, darkestKey);
 };
 
 async function processFile(file) {
