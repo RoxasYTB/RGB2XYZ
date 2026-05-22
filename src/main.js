@@ -1,6 +1,6 @@
 import { createCubeHelper } from './cube-helper.js';
 import { loadImage } from './image-loader.js';
-import { createPointCloud, disposePointCloud } from './point-cloud.js';
+import { createPointCloud, createGaussianSplatCloud, disposePointCloud } from './point-cloud.js';
 import { createScene } from './scene.js';
 
 const container = document.getElementById('canvas-container');
@@ -12,10 +12,13 @@ const statColors = document.getElementById('stat-colors');
 const statDisplayed = document.getElementById('stat-displayed');
 const statCompression = document.getElementById('stat-compression');
 const statTime = document.getElementById('stat-time');
-const statDarkest = document.getElementById('stat-darkest');
 const densityWrapper = document.getElementById('density-wrapper');
 const densitySlider = document.getElementById('density-slider');
 const densityValue = document.getElementById('density-value');
+const splatToggle = document.getElementById('splat-toggle');
+const splatSizeSlider = document.getElementById('splat-size');
+const splatSizeValue = document.getElementById('splat-size-value');
+const splatControls = document.getElementById('splat-controls');
 
 const { scene, requestRender } = createScene(container);
 scene.add(createCubeHelper());
@@ -39,14 +42,11 @@ function showProgress(visible) {
       progressEl.classList.toggle('visible', visible);
 }
 
-function showStats(totalPixels, uniqueCount, displayedCount, timeMs, darkestKey) {
+function showStats(totalPixels, uniqueCount, displayedCount, timeMs) {
       statPixels.textContent = formatNumber(totalPixels);
       statColors.textContent = formatNumber(uniqueCount);
       statDisplayed.textContent = formatNumber(displayedCount);
       statCompression.textContent = ((1 - uniqueCount / totalPixels) * 100).toFixed(2) + ' %';
-      statDarkest.textContent = darkestKey !== -1
-            ? `rgb(${(darkestKey >> 16) & 0xff}, ${(darkestKey >> 8) & 0xff}, ${darkestKey & 0xff})`
-            : '—';
       statTime.textContent = timeMs + ' ms';
       statsEl.classList.add('visible');
 }
@@ -56,24 +56,31 @@ function processWithWorker(buffer, width, height, maxPoints) {
       worker.postMessage({ data: copy, width, height, maxPoints }, [copy]);
 }
 
+function rebuildCloud() {
+      if (!lastImageBuffer) return;
+      showProgress(true);
+      worker._t0 = performance.now();
+      processWithWorker(lastImageBuffer, lastWidth, lastHeight, parseInt(densitySlider.value));
+}
+
 worker.onmessage = (e) => {
-      const { positions, colors, uniqueCount, displayedCount, totalPixels, darkestKey } = e.data;
+      const { positions, colors, uniqueCount, displayedCount, totalPixels } = e.data;
       const elapsed = Math.round(performance.now() - worker._t0);
 
-      if (darkestKey !== -1) {
-            const dr = (darkestKey >> 16) & 0xff;
-            const dg = (darkestKey >> 8) & 0xff;
-            const db = darkestKey & 0xff;
-            console.log(`Pixel le plus sombre (hors noir) : [${dr}, ${dg}, ${db}] — position RGB (${dr}, ${dg}, ${db})`);
-      }
-
       disposePointCloud(scene, currentCloud);
-      currentCloud = createPointCloud(positions, colors);
+
+      const useSplat = splatToggle.checked;
+      if (useSplat) {
+            const size = parseInt(splatSizeSlider.value);
+            currentCloud = createGaussianSplatCloud(positions, colors, size);
+      } else {
+            currentCloud = createPointCloud(positions, colors);
+      }
       scene.add(currentCloud);
       requestRender();
 
       showProgress(false);
-      showStats(totalPixels, uniqueCount, displayedCount, elapsed, darkestKey);
+      showStats(totalPixels, uniqueCount, displayedCount, elapsed);
 };
 
 async function processFile(file) {
@@ -86,6 +93,7 @@ async function processFile(file) {
       lastHeight = height;
 
       densityWrapper.classList.add('visible');
+      splatControls.classList.add('visible');
 
       worker._t0 = performance.now();
       processWithWorker(lastImageBuffer, lastWidth, lastHeight, parseInt(densitySlider.value));
@@ -95,13 +103,20 @@ let debounceTimer = null;
 densitySlider.addEventListener('input', () => {
       densityValue.textContent = formatK(parseInt(densitySlider.value));
       if (!lastImageBuffer) return;
-
       clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-            showProgress(true);
-            worker._t0 = performance.now();
-            processWithWorker(lastImageBuffer, lastWidth, lastHeight, parseInt(densitySlider.value));
-      }, 150);
+      debounceTimer = setTimeout(rebuildCloud, 150);
+});
+
+splatToggle.addEventListener('change', () => {
+      splatSizeSlider.disabled = !splatToggle.checked;
+      if (lastImageBuffer) rebuildCloud();
+});
+
+splatSizeSlider.addEventListener('input', () => {
+      splatSizeValue.textContent = splatSizeSlider.value;
+      if (!lastImageBuffer || !splatToggle.checked) return;
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(rebuildCloud, 150);
 });
 
 fileInput.addEventListener('change', (e) => {
